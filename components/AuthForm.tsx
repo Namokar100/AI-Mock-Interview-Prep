@@ -14,8 +14,8 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import FormField from './FormField'
 import { useRouter } from 'next/navigation';
-import { auth } from '@/firebase/client'
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth'
+import { auth, googleProvider } from '@/firebase/client'
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth'
 import { signUp, signIn } from '@/lib/actions/auth.action'
 
 const authFormSchema = (type: FormType) => {
@@ -29,7 +29,7 @@ const authFormSchema = (type: FormType) => {
 const AuthForm = ({ type } : {type: FormType}) => {
     const router = useRouter();
     const formSchema = authFormSchema(type);
-      // 1. Define your form.
+    // 1. Define your form.
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -94,6 +94,52 @@ const AuthForm = ({ type } : {type: FormType}) => {
     }
   }
 
+  // Google Sign In handler
+  const handleGoogleSignIn = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      
+      // Get the user's ID token
+    //   const idToken = await user.getIdToken();
+      
+      if (type === 'sign-up') {
+        // For sign up, create the user in your database
+        const results = await signUp({
+          uid: user.uid,
+          name: user.displayName || 'Google User',
+          email: user.email!,
+          password: '' // Password not needed for OAuth
+        });
+        
+        if (!results?.success) {
+          toast.error(results?.message);
+          return;
+        }
+        
+        toast.success("User created successfully");
+      }
+      
+      // For both sign-up and sign-in, create a session
+      const idToken = await user.getIdToken();
+      const signInResult = await signIn({
+        email: user.email!,
+        idToken
+      });
+      
+      if (!signInResult?.success) {
+        toast.error(signInResult?.message);
+        return;
+      }
+      
+      toast.success("Signed in with Google successfully");
+      router.push("/");
+    } catch (error) {
+      console.error("Google sign in error:", error);
+      toast.error(`Google sign in failed: ${error}`);
+    }
+  };
+
   const isSignIn = type === "sign-in";
   return (
     <div className='card-border lg:min-w-[566px]'>
@@ -130,9 +176,23 @@ const AuthForm = ({ type } : {type: FormType}) => {
                         placeholder="Enter your password" 
                         type="password" 
                     />
-                    <Button className='btn' type="submit"> {isSignIn ? "Sign In" : "Create Account"}</Button>
+                    <Button className='btn w-full' type="submit"> {isSignIn ? "Sign In" : "Create Account"}</Button>
                 </form>
             </Form>
+
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+            </div>
+
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="flex items-center justify-center gap-2" 
+              onClick={handleGoogleSignIn}
+            >
+              <Image src="/google.svg" alt="Google" width={16} height={16} />
+              {isSignIn ? "Sign in with Google" : "Sign up with Google"}
+            </Button>
 
             <p className='text-center'>
                 {isSignIn ? "Don't have an account?" : "Already have an account?"}
