@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { vapi } from '@/lib/vapi.sdk';
 import { interviewer } from '@/constants';
+import { createFeedback } from '@/lib/actions/general.action';
 
 enum CallStatus {
   INACTIVE = 'INACTIVE',
@@ -14,7 +15,7 @@ enum CallStatus {
   FINISHED = 'FINISHED'
 }
 
-interface saavedMessage {
+interface savedMessage {
   role: 'user' | 'assistant'| 'system';
   content: string;
 }
@@ -24,7 +25,7 @@ const agent = ({userName, userId, type, interviewId, questions } : AgentProps) =
 
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE);
-  const [messages, setMessages] = useState<saavedMessage[]>([]);
+  const [messages, setMessages] = useState<savedMessage[]>([]);
   const [lastMessage, setLastMessage] = useState<string>("");
 
   useEffect(() => {
@@ -63,23 +64,41 @@ const agent = ({userName, userId, type, interviewId, questions } : AgentProps) =
     
   }, []);
 
-  const handleGenerateFeedback = async (messages: saavedMessage[]) => {
-    // const feedback = await generateFeedback(messages);
-    console.log('generate feedback');
+  // const handleGenerateFeedback = async (messages: saavedMessage[]) => {
+  //   // const feedback = await generateFeedback(messages);
+  //   console.log('generate feedback');
 
-    // create a server action that generates feedback
-    const { success, id } = {
-      success: true,
-      id: '123'
-    }
+  //   // create a server action that generates feedback
+  //   const { success, id } = {
+  //     success: true,
+  //     id: '123'
+  //   }
 
-    if(success && id){
+  //   if(success && id){
+  //     router.push(`/interview/${interviewId}/feedback`);
+  //   } else{
+  //     console.log('error generating feedback');
+  //     router.push('/');
+  //   }
+  // }
+
+  const handleGenerateFeedback = async (messages: savedMessage[]) => {
+    console.log("handleGenerateFeedback");
+
+    const { success, feedbackId: id } = await createFeedback({
+      interviewId: interviewId!,
+      userId: userId!,
+      transcript: messages,
+      // feedbackId,
+    });
+
+    if (success && id) {
       router.push(`/interview/${interviewId}/feedback`);
-    } else{
-      console.log('error generating feedback');
-      router.push('/');
+    } else {
+      console.log("Error saving feedback");
+      router.push("/");
     }
-  }
+  };
 
   useEffect(() => {
     if(callStatus === CallStatus.FINISHED){
