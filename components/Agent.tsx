@@ -125,12 +125,12 @@ const agent = ({userName, userId, type } : AgentProps) => {
               <button className='relative btn-call' onClick={handleCall}>
                 <span className={cn('absolute animate-ping rounded-full opacity-75', callStatus !== 'CONNECTING' && 'hidden')} />
                   <span>
-                    {isCallInactiveOrFinished ? 'Call' : '. . . '}
+                    {isCallInactiveOrFinished ? 'Call' : 'Connecting . . . '}
                   </span>
               </button>
             ) : 
             (
-              <button className='btn-disconnet' onClick={handleDisconnect}>
+              <button className='btn-disconnect' onClick={handleDisconnect}>
                   End
               </button>
             )}
