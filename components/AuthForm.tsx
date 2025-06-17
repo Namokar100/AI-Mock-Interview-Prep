@@ -43,8 +43,13 @@ const AuthForm = ({ type } : {type: FormType}) => {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try{
         if(type === 'sign-up'){
-
             const {name, email, password} = values;
+            
+            if (password.length < 6) {
+                toast.error("Password must be at least 6 characters long");
+                return;
+            }
+
             const userCredentials = await createUserWithEmailAndPassword(auth, email, password);
 
             const results = await signUp({
@@ -59,19 +64,17 @@ const AuthForm = ({ type } : {type: FormType}) => {
                 return;
             }
             
-            toast.success("Signed up successfully");
+            toast.success("Account created successfully! Please sign in.");
             router.push("/sign-in");
-        }else{
-
+        } else {
             const { email, password } = values;
             
-            // Create userCredentials by signing in with Firebase first
             const userCredentials = await signInWithEmailAndPassword(auth, email, password);
 
             const idToken = await userCredentials.user.getIdToken();
 
             if(!idToken) {
-                toast.error("Sign in failed, Please try again");
+                toast.error("Sign in failed. Please try again.");
                 return;
             }
 
@@ -85,12 +88,38 @@ const AuthForm = ({ type } : {type: FormType}) => {
                 return;
             }
 
-            toast.success("Signed in successfully");
+            toast.success("Welcome back! Signed in successfully.");
             router.push("/");
         }
-    }catch(e){
+    } catch(e: any) {
         console.log(e);
-        toast.error(`There was an error: ${e}`);
+        
+        // Handle specific Firebase error codes
+        switch (e.code) {
+            case 'auth/email-already-in-use':
+                toast.error("This email is already registered. Please sign in instead.");
+                break;
+            case 'auth/invalid-email':
+                toast.error("Please enter a valid email address.");
+                break;
+            case 'auth/weak-password':
+                toast.error("Password is too weak. Please use a stronger password.");
+                break;
+            case 'auth/user-not-found':
+                toast.error("No account found with this email. Please sign up first.");
+                break;
+            case 'auth/wrong-password':
+                toast.error("Incorrect password. Please try again.");
+                break;
+            case 'auth/too-many-requests':
+                toast.error("Too many failed attempts. Please try again later.");
+                break;
+            case 'auth/invalid-credential':
+                toast.error("Invalid email or password. Please check your credentials.");
+                break;
+            default:
+                toast.error("An error occurred. Please try again.");
+        }
     }
   }
 
@@ -100,16 +129,12 @@ const AuthForm = ({ type } : {type: FormType}) => {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
       
-      // Get the user's ID token
-    //   const idToken = await user.getIdToken();
-      
       if (type === 'sign-up') {
-        // For sign up, create the user in your database
         const results = await signUp({
           uid: user.uid,
           name: user.displayName || 'Google User',
           email: user.email!,
-          password: '' // Password not needed for OAuth
+          password: ''
         });
         
         if (!results?.success) {
@@ -117,10 +142,9 @@ const AuthForm = ({ type } : {type: FormType}) => {
           return;
         }
         
-        toast.success("User created successfully");
+        toast.success("Account created successfully with Google!");
       }
       
-      // For both sign-up and sign-in, create a session
       const idToken = await user.getIdToken();
       const signInResult = await signIn({
         email: user.email!,
@@ -132,11 +156,27 @@ const AuthForm = ({ type } : {type: FormType}) => {
         return;
       }
       
-      toast.success("Signed in with Google successfully");
+      toast.success("Welcome! Signed in with Google successfully.");
       router.push("/");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Google sign in error:", error);
-      toast.error(`Google sign in failed: ${error}`);
+      
+      switch (error.code) {
+        case 'auth/popup-closed-by-user':
+          toast.error("Sign in cancelled. Please try again.");
+          break;
+        case 'auth/popup-blocked':
+          toast.error("Pop-up was blocked. Please allow pop-ups and try again.");
+          break;
+        case 'auth/cancelled-popup-request':
+          toast.error("Sign in cancelled. Please try again.");
+          break;
+        case 'auth/account-exists-with-different-credential':
+          toast.error("An account already exists with this email using a different sign-in method.");
+          break;
+        default:
+          toast.error("Failed to sign in with Google. Please try again.");
+      }
     }
   };
 
@@ -176,6 +216,13 @@ const AuthForm = ({ type } : {type: FormType}) => {
                         placeholder="Enter your password" 
                         type="password" 
                     />
+                    {isSignIn && (
+                        <div className="flex justify-end">
+                            <Link href="/forgot-password" className="text-sm text-primary-200 hover:underline">
+                                Forgot Password?
+                            </Link>
+                        </div>
+                    )}
                     <Button className='btn w-full' type="submit"> {isSignIn ? "Sign In" : "Create Account"}</Button>
                 </form>
             </Form>

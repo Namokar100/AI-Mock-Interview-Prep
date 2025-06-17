@@ -1,7 +1,9 @@
 'use server'
 
-import { db, auth } from "@/firebase/admin";
+import { db, auth as adminAuth } from "@/firebase/admin";
+import { auth } from "@/firebase/client";
 import { cookies } from "next/headers";
+import { sendPasswordResetEmail as firebaseSendPasswordResetEmail } from "firebase/auth";
 
 
 const ONE_WEEK = 60 * 60 * 24 * 7;
@@ -50,7 +52,7 @@ export async function signUp(params: SignUpParams) {
 export async function setSessionCookie(idToken: string) {
     const cookieStore = await cookies();
 
-    const sessionCookie = await auth.createSessionCookie(idToken, {
+    const sessionCookie = await adminAuth.createSessionCookie(idToken, {
         expiresIn: ONE_WEEK * 1000
     });
 
@@ -66,7 +68,7 @@ export async function setSessionCookie(idToken: string) {
 export async function signIn(params: SignInParams) {
     const { email, idToken } = params;
     try {
-        const userRecord = await auth.getUserByEmail(email);
+        const userRecord = await adminAuth.getUserByEmail(email);
 
         if(!userRecord) {
             return {
@@ -100,7 +102,7 @@ export async function getCurrentUser(): Promise<User | null> {
     }
 
     try {
-        const decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
+        const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
         
         const userRecord = await db.collection('users').doc(decodedClaims.uid).get();
 
@@ -122,5 +124,53 @@ export async function isAuthenticated() {
     const user = await getCurrentUser();
 
     return !!user;
+}
+
+export async function signOut() {
+    const cookieStore = await cookies();
+    
+    // Clear the session cookie
+    cookieStore.delete('session');
+    
+    return {
+        success: true,
+        message: 'Signed out successfully'
+    };
+}
+
+export async function sendPasswordResetEmail(email: string) {
+    try {
+        // First check if user exists in our database
+        const userRecord = await adminAuth.getUserByEmail(email);
+        
+        if (!userRecord) {
+            return {
+                success: false,
+                message: 'No account found with this email address'
+            };
+        }
+
+        // If user exists, send password reset email
+        await firebaseSendPasswordResetEmail(auth, email);
+        
+        return {
+            success: true,
+            message: 'Password reset email sent successfully'
+        };
+    } catch (e: any) {
+        console.log('Error sending password reset email:', e);
+        
+        if (e.code === 'auth/user-not-found') {
+            return {
+                success: false,
+                message: 'No account found with this email address'
+            };
+        }
+        
+        return {
+            success: false,
+            message: 'Failed to send password reset email'
+        };
+    }
 }
 
